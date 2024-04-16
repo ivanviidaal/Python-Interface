@@ -7,27 +7,48 @@ import random
 from datetime import datetime
 from tkinter.simpledialog import askstring
 from tkinter import filedialog
+import webbrowser
 
 class Roles:
     USUARIO = "Usuario"
     VIP = "Vip"
     ADMINISTRADOR = "Administrador"
 
+class Utilidades:
+    @staticmethod
+    def encriptar_contraseña(contraseña):
+        contraseña_bytes = contraseña.encode('utf-8')
+        hash_obj = hashlib.sha256()
+        hash_obj.update(contraseña_bytes)
+        hash_hex = hash_obj.hexdigest()
+        return hash_hex
+    
+
 class LoginWindow:
     def __init__(self, root):
         self.root = root
         self.root.title("Inicio de Sesión")
-        self.root.geometry("400x400")
         self.root.resizable(False, False)
-        self.usuario = None
+
+        # Ancho y alto de la pantalla
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+
+        # Coordenadas para centrar la ventana y desplazarla un poco hacia arriba
+        x_coordinate = (screen_width - 400) // 2
+        y_coordinate = (screen_height - 400) // 4
+
+        # Establecer la geometría de la ventana
+        self.root.geometry(f"400x400+{x_coordinate}+{y_coordinate}")
 
         frame = Frame(self.root, padx=20, pady=20)
         frame.pack(padx=10, pady=10)
 
-        image = PhotoImage(file="programa/icon.png")
+        # Agregar la imagen de inicio de sesión
+        image = PhotoImage(file="icon.png")  # Ruta de tu imagen de inicio de sesión
         self.label_image = Label(frame, image=image)
-        self.label_image.grid(row=0, columnspan=2)
-        self.label_image.image = image
+        self.label_image.grid(row=0, columnspan=2)  # Esta fila ocupa dos columnas
+        self.label_image.image = image  # Mantener una referencia para evitar que la imagen sea eliminada por el recolector de basura
 
         self.label_usuario = Label(frame, text="Usuario:", padx=5, pady=5)
         self.label_usuario.grid(row=1, column=0, sticky="e")
@@ -58,6 +79,11 @@ class LoginWindow:
         usuario = self.entry_usuario.get()
         contraseña = self.entry_contraseña.get()
         
+        # Verificar que la contraseña cumpla con ciertos criterios de seguridad
+        if not self.verificar_contraseña_segura(contraseña):
+            messagebox.showerror("Error", "La contraseña no es segura")
+            return
+        
         contraseña_encriptada = self.encriptar_contraseña(contraseña)
         
         rol_usuario = Roles.USUARIO
@@ -78,6 +104,12 @@ class LoginWindow:
                 messagebox.showinfo("Registro", "Usuario registrado correctamente")
             else:
                 messagebox.showerror("Error", "Hubo un error al registrar el usuario")
+
+    def verificar_contraseña_segura(self, contraseña):
+        if len(contraseña) < 8:
+            return False
+        
+        return True
 
     def iniciar_sesion(self):
         usuario = self.entry_usuario.get()
@@ -102,6 +134,7 @@ class LoginWindow:
         else:
             messagebox.showerror("Error", "Usuario o contraseña incorrectos")
 
+#####################################################################################################3
 
 class MainWindow:
     def __init__(self, root, rol, nombre_usuario, usuario):
@@ -110,7 +143,17 @@ class MainWindow:
         self.nombre_usuario = nombre_usuario
         self.usuario = usuario
         self.root.title("Ventana Principal")
-        self.root.geometry("900x900")
+
+        # Ancho y alto de la pantalla
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+
+        # Coordenadas para centrar la ventana y desplazarla un poco hacia arriba
+        x_coordinate = (screen_width - 900) // 2
+        y_coordinate = (screen_height - 900) // 4
+
+        # Establecer la geometría de la ventana
+        self.root.geometry(f"900x900+{x_coordinate}+{y_coordinate}")
         
         menubar = Menu(root)
         root.config(menu=menubar)
@@ -130,7 +173,7 @@ class MainWindow:
         menubar.add_cascade(label="Licencias", menu=licencias_menu)
 
         ayuda_menu = Menu(menubar, tearoff=0)
-        ayuda_menu.add_command(label="Sobre nosotros")
+        ayuda_menu.add_command(label="Sobre nosotros", command=self.abrir_perfil_github)
         ayuda_menu.add_command(label="Soporte")
         ayuda_menu.add_command(label="Manual")
         menubar.add_cascade(label="Ayuda", menu=ayuda_menu)
@@ -138,10 +181,9 @@ class MainWindow:
         perfil_menu = Menu(menubar, tearoff=0)
         perfil_menu.add_command(label="Mi Cuenta", command=lambda: self.mostrar_info_cuenta(nombre_usuario, rol))
         perfil_menu.add_command(label="Cambiar usuario", command=self.cambiar_usuario)
-        perfil_menu.add_command(label="Cambiar contraseña")
+        perfil_menu.add_command(label="Cambiar contraseña", command=self.cambiar_contraseña)
         perfil_menu.add_command(label="Eliminar mi cuenta", command=self.eliminar_cuenta)
         menubar.add_cascade(label=nombre_usuario.capitalize(), menu=perfil_menu)
-        
 
         self.crear_menu(rol, menubar)
 
@@ -206,23 +248,141 @@ class MainWindow:
         nuevo_usuario = askstring("Cambiar Usuario", "Introduce el nuevo nombre de usuario:")
 
         if usuario_actual and nuevo_usuario:
-            url = "https://fearless-chain-healer.glitch.me/articles/update"
-            payload = {"usuario_actual": usuario_actual, "nuevo_usuario": nuevo_usuario}
-            response = requests.put(url, json=payload)
-
-            if response.ok:
-                messagebox.showinfo("Éxito", "El nombre de usuario se ha actualizado correctamente.")
+            # URL de la base de datos en Glitch
+            url = 'https://fearless-chain-healer.glitch.me/articles'
+            
+            # Hacer una solicitud GET para obtener los datos actuales
+            response = requests.get(url)
+            
+            # Verificar si la solicitud fue exitosa
+            if response.status_code == 200:
+                # Obtener los datos actuales en formato JSON
+                data = response.json()
+                
+                # Buscar el usuario en los datos
+                usuario_encontrado = False
+                for item in data:
+                    if 'correo' in item and item['correo'] == usuario_actual:
+                        # Actualizar el nombre de usuario
+                        item['correo'] = nuevo_usuario
+                        usuario_encontrado = True
+                        
+                        # Enviar una solicitud PATCH para actualizar solo este usuario
+                        patch_url = f"{url}/{item['id']}"
+                        response = requests.patch(patch_url, json=item)
+                        if response.status_code == 200:
+                            messagebox.showinfo("Éxito", "El nombre de usuario se ha actualizado correctamente.")
+                            
+                            # Cerrar sesión después de cambiar el nombre de usuario
+                            self.cerrar_sesion()
+                        else:
+                            messagebox.showerror("Error", "No se pudo actualizar el nombre de usuario. Inténtalo de nuevo.")
+                        break
+                
+                if not usuario_encontrado:
+                    messagebox.showerror("Error", f"No se encontró el usuario '{usuario_actual}'.")
             else:
-                messagebox.showerror("Error", "No se pudo actualizar el nombre de usuario. Inténtalo de nuevo.")
+                messagebox.showerror("Error", "Error al obtener los datos de la base de datos.")
         else:
-             messagebox.showwarning("Advertencia", "Por favor, introduce todos los campos correctamente.")
+            messagebox.showwarning("Advertencia", "Por favor, introduce todos los campos correctamente.")
+
+    def cambiar_contraseña(self):
+        cambiar_contraseña_ventana = Toplevel(self.root)
+        cambiar_contraseña_ventana.title("Cambiar Contraseña")
+        
+        frame = Frame(cambiar_contraseña_ventana, padx=20, pady=20)
+        frame.pack(padx=10, pady=10)
+
+        label_usuario = Label(frame, text="Usuario actual:")
+        label_usuario.grid(row=0, column=0, sticky="e")
+
+        entry_usuario = Entry(frame, width=30)
+        entry_usuario.grid(row=0, column=1)
+
+        label_contraseña_actual = Label(frame, text="Contraseña actual:")
+        label_contraseña_actual.grid(row=1, column=0, sticky="e")
+
+        entry_contraseña_actual = Entry(frame, show="*", width=30)
+        entry_contraseña_actual.grid(row=1, column=1)
+
+        label_nueva_contraseña = Label(frame, text="Nueva contraseña:")
+        label_nueva_contraseña.grid(row=2, column=0, sticky="e")
+
+        entry_nueva_contraseña = Entry(frame, show="*", width=30)
+        entry_nueva_contraseña.grid(row=2, column=1)
+
+        frame_aceptar = Frame(cambiar_contraseña_ventana)
+        frame_aceptar.pack(pady=10)
+
+        def aceptar():
+            usuario_actual = entry_usuario.get()
+            contraseña_actual = entry_contraseña_actual.get()
+            nueva_contraseña = entry_nueva_contraseña.get()
+
+            if usuario_actual and contraseña_actual and nueva_contraseña:
+                # URL de la base de datos en Glitch
+                url = 'https://fearless-chain-healer.glitch.me/articles'
+                
+                # Hacer una solicitud GET para obtener los datos actuales
+                response = requests.get(url)
+                
+                # Verificar si la solicitud fue exitosa
+                if response.status_code == 200:
+                    # Obtener los datos actuales en formato JSON
+                    data = response.json()
+                    
+                    # Encriptar la contraseña actual para compararla con la almacenada en la base de datos
+                    contraseña_actual_encriptada = Utilidades.encriptar_contraseña(contraseña_actual)
+                    
+                    # Buscar el usuario en los datos
+                    usuario_encontrado = False
+                    for item in data:
+                        if 'correo' in item and item['correo'] == usuario_actual:
+                            # Verificar si la contraseña actual coincide
+                            if 'contra' in item and item['contra'] == contraseña_actual_encriptada:
+                                # Encriptar la nueva contraseña
+                                nueva_contraseña_encriptada = Utilidades.encriptar_contraseña(nueva_contraseña)
+                                
+                                # Actualizar la contraseña del usuario
+                                item['contra'] = nueva_contraseña_encriptada
+                                usuario_encontrado = True
+                                
+                                # Enviar una solicitud PATCH para actualizar solo este usuario
+                                patch_url = f"{url}/{item['id']}"
+                                response = requests.patch(patch_url, json=item)
+                                if response.status_code == 200:
+                                    messagebox.showinfo("Éxito", "La contraseña se ha cambiado correctamente.")
+                                    
+                                    # Cerrar sesión después de cambiar la contraseña
+                                    self.cerrar_sesion()
+                                else:
+                                    messagebox.showerror("Error", "No se pudo cambiar la contraseña. Inténtalo de nuevo.")
+                                break
+                            else:
+                                messagebox.showerror("Error", "La contraseña actual es incorrecta.")
+                    
+                    if not usuario_encontrado:
+                        messagebox.showerror("Error", f"No se encontró el usuario '{usuario_actual}'.")
+                else:
+                    messagebox.showerror("Error", "Error al obtener los datos de la base de datos.")
+            else:
+                messagebox.showwarning("Advertencia", "Por favor, introduce todos los campos correctamente.")
+
+        button_aceptar = Button(frame_aceptar, text="Aceptar", command=aceptar)
+        button_aceptar.pack(side="left", padx=10)
+
+        button_cancelar = Button(frame_aceptar, text="Cancelar", command=cambiar_contraseña_ventana.destroy)
+        button_cancelar.pack(side="left", padx=10)
+
+####### -- CAMBIAR ROL -- #######
 
     def cambiar_rol(self):
         cambiar_rol_window = Toplevel(self.root)
+        cambiar_rol_window.geometry("500x400")
         cambiar_rol_window.title("Cambiar Rol de Usuario")
 
         response = requests.get("https://fearless-chain-healer.glitch.me/articles")
-        usuarios = [usuario['correo'] for usuario in response.json()]
+        usuarios = [usuario['correo'] for usuario in response.json() if 'correo' in usuario]
 
         Label(cambiar_rol_window, text="Seleccionar usuario:").pack()
         usuario_var = StringVar(cambiar_rol_window)
@@ -240,6 +400,7 @@ class MainWindow:
             nuevo_rol = nuevo_rol_var.get()
             if self.cambiar_rol_usuario(usuario, nuevo_rol):
                 messagebox.showinfo("Cambio de Rol", f"Rol cambiado a {nuevo_rol} correctamente")
+                cambiar_rol_window.destroy()  # Cerrar la ventana después de cambiar el rol
             else:
                 messagebox.showerror("Error", "No se pudo cambiar el rol")
 
@@ -247,17 +408,47 @@ class MainWindow:
 
     def cambiar_rol_usuario(self, correo, nuevo_rol):
         try:
-            payload = {"rol": nuevo_rol}
-            response = requests.put(f"https://fearless-chain-healer.glitch.me/articles/{correo}", json=payload)
+            # URL de la base de datos en Glitch
+            url = 'https://fearless-chain-healer.glitch.me/articles'
             
-            if response.ok:
-                return True
+            # Hacer una solicitud GET para obtener los datos actuales
+            response = requests.get(url)
+            
+            # Verificar si la solicitud fue exitosa
+            if response.status_code == 200:
+                # Obtener los datos actuales en formato JSON
+                data = response.json()
+                
+                # Buscar el usuario en los datos
+                usuario_encontrado = False
+                for item in data:
+                    if 'correo' in item and item['correo'] == correo:
+                        # Actualizar el rol del usuario
+                        item['rol'] = nuevo_rol
+                        usuario_encontrado = True
+                        
+                        # Enviar una solicitud PATCH para actualizar solo este usuario
+                        patch_url = f"{url}/{item['id']}"
+                        response = requests.patch(patch_url, json=item)
+                        if response.status_code == 200:
+                            print(f"Se ha actualizado el rol de '{correo}' a '{nuevo_rol}'.")
+                            return True
+                        else:
+                            print("Error al actualizar el rol del usuario.")
+                            return False
+                        break
+                
+                if not usuario_encontrado:
+                    print(f"No se encontró el usuario '{correo}'.")
+                    return False
             else:
-                print("Error al actualizar el rol del usuario:", response.text)
+                print("Error al obtener los datos de la base de datos.")
                 return False
         except Exception as e:
-            print("Error durante la solicitud PUT:", e)
+            print("Error durante la solicitud PATCH:", e)
             return False
+    
+####### -- ELIMINAR CUENTA -- #######
 
     def eliminar_cuenta(self):
         if messagebox.askyesno("Eliminar Cuenta", "¿Estás seguro de que deseas eliminar tu cuenta? Esta acción no se puede deshacer."):
@@ -287,6 +478,8 @@ class MainWindow:
             except Exception as e:
                 messagebox.showerror("Error", f"Ocurrió un error al eliminar la cuenta: {e}")
 
+####### -- CREAR MENU -- #######
+
     def crear_menu(self, rol, menubar):
         if rol == Roles.ADMINISTRADOR:
             admin_menu = Menu(menubar, tearoff=0)
@@ -297,6 +490,8 @@ class MainWindow:
             vip_menu = Menu(menubar, tearoff=0)
             vip_menu.add_command(label="test", command=lambda: print("Opción para usuarios VIP"))
             menubar.add_cascade(label="Vip", menu=vip_menu)
+
+####### -- LICENCIAS -- #######
 
     def generar_licencia_y_enviar(self):
         caracteres = string.ascii_uppercase + string.digits
@@ -328,16 +523,43 @@ class MainWindow:
         try:
             nombre_usuario = self.nombre_usuario
             
-            url = f"https://fearless-chain-healer.glitch.me/articles/{nombre_usuario}"
-            payload = {"rol": Roles.VIP}
-            response = requests.put(url, json=payload)
+            # URL de la base de datos en Glitch
+            url = 'https://fearless-chain-healer.glitch.me/articles'
             
-            if response.ok:
-                messagebox.showinfo("Actualización de Rol", "Tu rol ha sido actualizado a VIP.")
+            # Hacer una solicitud GET para obtener los datos actuales
+            response = requests.get(url)
+            
+            # Verificar si la solicitud fue exitosa
+            if response.status_code == 200:
+                # Obtener los datos actuales en formato JSON
+                data = response.json()
+                
+                # Buscar el usuario en los datos
+                usuario_encontrado = False
+                for item in data:
+                    if 'correo' in item and item['correo'] == nombre_usuario:
+                        # Actualizar el rol del usuario a VIP
+                        item['rol'] = Roles.VIP
+                        usuario_encontrado = True
+                        
+                        # Enviar una solicitud PATCH para actualizar solo este usuario
+                        patch_url = f"{url}/{item['id']}"
+                        response = requests.patch(patch_url, json=item)
+                        if response.status_code == 200:
+                            messagebox.showinfo("Actualización de Rol", "Tu rol ha sido actualizado a VIP.")
+                        else:
+                            messagebox.showerror("Error", "No se pudo actualizar tu rol. Inténtalo de nuevo.")
+                        break
+                
+                if not usuario_encontrado:
+                    messagebox.showerror("Error", f"No se encontró el usuario '{nombre_usuario}'.")
             else:
-                messagebox.showerror("Error", "No se pudo actualizar tu rol. Inténtalo de nuevo.")
+                messagebox.showerror("Error", "Error al obtener los datos de la base de datos.")
         except Exception as e:
             messagebox.showerror("Error", f"Ocurrió un error al actualizar el rol: {e}")
+
+
+####### -- PERFIL -- #######
 
     def mostrar_info_cuenta(self, nombre_usuario, rol):
         ventana_info_cuenta = Toplevel(self.root)
@@ -370,8 +592,12 @@ class MainWindow:
         close_button = Button(ventana_info_cuenta, text="Cerrar", command=ventana_info_cuenta.destroy)
         close_button.pack(pady=5)
 
+####### -- GITHUB -- #######
 
-# Ejecutar la aplicación
+    def abrir_perfil_github(self):
+        webbrowser.open("https://github.com/ivanviidaal")
+        
+
 root = Tk()
 app = LoginWindow(root)
 root.mainloop()
