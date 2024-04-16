@@ -24,7 +24,7 @@ class LoginWindow:
         frame = Frame(self.root, padx=20, pady=20)
         frame.pack(padx=10, pady=10)
 
-        image = PhotoImage(file="programa/iconcito-removebg-preview.png")
+        image = PhotoImage(file="programa/icon.png")
         self.label_image = Label(frame, image=image)
         self.label_image.grid(row=0, columnspan=2)
         self.label_image.image = image
